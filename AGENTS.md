@@ -28,26 +28,40 @@ If requirements materially conflict, report the conflict instead of silently cho
 
 ## Development environment
 
-These commands are provisional until the repository bootstrap is complete. Update them to match the real package manager, directory structure, and scripts once established.
+These commands are provisional until the repository bootstrap is complete. They assume the planned layout in `docs/v0-spec.md`, with Python project files and `manage.py` under `app/`. Update them to match the scripts and paths that are actually scaffolded.
 
-* Install dependencies: `uv sync`
-* Start services: `docker compose up -d`
-* Apply migrations: `uv run python manage.py migrate`
-* Run the app: `uv run python manage.py runserver`
-* Run an import: `uv run python manage.py import_jobs`
+Start repository-level services from the repository root:
 
-If `manage.py` is placed under a subdirectory such as `app/`, update these commands accordingly.
+```text
+docker compose up -d
+```
+
+Run Python and Django commands from the `app/` directory:
+
+```text
+cd app
+uv sync
+uv run python manage.py migrate
+uv run python manage.py runserver
+uv run python manage.py import_jobs
+```
 
 ## Testing and verification
 
-Run the relevant available checks before reporting a task complete:
+Run Python checks from `app/` and Compose validation from the repository root. These commands remain provisional until the application and CI workflow are scaffolded:
 
-* Lint: `uv run ruff check .`
-* Format check: `uv run ruff format --check .`
-* Tests: `uv run pytest`
-* Django system check: `uv run python manage.py check`
-* Migration check: `uv run python manage.py makemigrations --check --dry-run`
-* Compose validation: `docker compose config`
+```text
+cd app
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+uv run python manage.py check
+uv run python manage.py makemigrations --check --dry-run
+```
+
+```text
+docker compose config
+```
 
 Once CI is configured, keep this list aligned with the workflows under `.github/workflows/`. The workflow files are the final source of truth for CI behavior.
 

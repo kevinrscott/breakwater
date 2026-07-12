@@ -37,4 +37,6 @@ _Coming once the v0 scaffolding lands — Django + PostgreSQL via Docker Compose
 | [`docs/vision.md`](docs/vision.md) | The problem, priorities, and product principles |
 | [`docs/v0-spec.md`](docs/v0-spec.md) | The exact v0 build spec — data model, classification rules, definition of done |
 | [`docs/roadmap.md`](docs/roadmap.md) | Where this goes after v0 is validated |
+| [`docs/source-notes.md`](docs/source-notes.md) | Evaluation and selection record for the first job-data source |
+| [`docs/usage-log.md`](docs/usage-log.md) | Findings from real-world use once v0 is functional |
 | [`AGENTS.md`](AGENTS.md) | Workflow and rules for AI-assisted contributions |
