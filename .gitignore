@@ -9,7 +9,7 @@ __pycache__/
 .env.*
 !.env.example
 
-# Testing and tools
+# Testing and development tools
 .pytest_cache/
 .ruff_cache/
 .coverage
@@ -18,6 +18,7 @@ htmlcov/
 # Django
 staticfiles/
 media/
+*.sqlite3
 
 # Editors
 .vscode/
@@ -27,7 +28,6 @@ media/
 .DS_Store
 Thumbs.db
 
-# Local data
-*.sqlite3
+# Private local data
 local-data/
 private/
