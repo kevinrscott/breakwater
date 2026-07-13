@@ -28,7 +28,49 @@ Development uses AI-assisted coding under explicit review discipline — one iss
 
 ## Setup
 
-_Coming once the v0 scaffolding lands — Django + PostgreSQL via Docker Compose. See [`docs/v0-spec.md`](docs/v0-spec.md) for the target stack._
+The current workspace runs Django on the host and connects to an existing PostgreSQL server. Docker Compose is not included yet.
+
+Prerequisites:
+
+- Python 3.12
+- [`uv`](https://docs.astral.sh/uv/)
+- PostgreSQL with a database and user available for local development
+
+From the repository root, create the local environment file:
+
+```powershell
+cd app
+copy .env.example .env
+```
+
+Edit `app/.env` to match the local PostgreSQL database and replace the development-only secret placeholder. The settings require all of these variables:
+
+| Variable | Purpose |
+|---|---|
+| `DJANGO_SECRET_KEY` | Local Django signing key; use a unique secret outside this example |
+| `DJANGO_DEBUG` | `true` or `false` |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated host names accepted by Django |
+| `POSTGRES_DB` | PostgreSQL database name |
+| `POSTGRES_USER` | PostgreSQL user |
+| `POSTGRES_PASSWORD` | PostgreSQL password |
+| `POSTGRES_HOST` | PostgreSQL server host name |
+| `POSTGRES_PORT` | PostgreSQL server port |
+
+Install dependencies, validate the Django configuration, and apply Django's initial migrations:
+
+```powershell
+uv sync
+uv run python manage.py check
+uv run python manage.py migrate
+```
+
+Start the development server:
+
+```powershell
+uv run python manage.py runserver
+```
+
+The development server then listens at `http://127.0.0.1:8000/`. Stop it with `Ctrl+C`.
 
 ## Documentation
 
