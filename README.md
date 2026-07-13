@@ -28,22 +28,23 @@ Development uses AI-assisted coding under explicit review discipline — one iss
 
 ## Setup
 
-The current workspace runs Django on the host and connects to an existing PostgreSQL server. Docker Compose is not included yet.
+Django runs on the host and connects to PostgreSQL running in Docker Compose.
 
 Prerequisites:
 
 - Python 3.12
 - [`uv`](https://docs.astral.sh/uv/)
-- PostgreSQL with a database and user available for local development
+- Docker with Docker Compose
 
-From the repository root, create the local environment file:
+From the repository root, create the ignored local environment file:
 
 ```powershell
-cd app
-copy .env.example .env
+Copy-Item app/.env.example app/.env
 ```
 
-Edit `app/.env` to match the local PostgreSQL database and replace the development-only secret placeholder. The settings require all of these variables:
+Before starting PostgreSQL for the first time, replace the two development-only secret placeholders in `app/.env`. Compose uses this file to initialize PostgreSQL, and Django uses the same database values. Keep `POSTGRES_HOST=localhost` because Django runs on the host, not inside Compose.
+
+The configuration requires all of these variables:
 
 | Variable | Purpose |
 |---|---|
@@ -56,10 +57,21 @@ Edit `app/.env` to match the local PostgreSQL database and replace the developme
 | `POSTGRES_HOST` | PostgreSQL server host name |
 | `POSTGRES_PORT` | PostgreSQL server port |
 
-Install dependencies, validate the Django configuration, and apply Django's initial migrations:
+Start PostgreSQL from the repository root and confirm that it becomes healthy:
 
 ```powershell
-uv sync
+docker compose --env-file app/.env config
+docker compose --env-file app/.env up -d
+docker compose --env-file app/.env ps
+```
+
+The named `postgres_data` volume preserves database data across normal `docker compose down` and restart cycles. PostgreSQL initialization variables only apply when this volume is empty, so changing the database name, user, or password later requires updating the existing database or intentionally recreating the volume.
+
+Install dependencies, validate the Django configuration, and apply Django's initial migrations from `app/`:
+
+```powershell
+Set-Location app
+uv sync --locked
 uv run python manage.py check
 uv run python manage.py migrate
 ```
@@ -71,6 +83,13 @@ uv run python manage.py runserver
 ```
 
 The development server then listens at `http://127.0.0.1:8000/`. Stop it with `Ctrl+C`.
+
+When finished, stop PostgreSQL from the repository root without deleting its data volume:
+
+```powershell
+Set-Location ..
+docker compose --env-file app/.env down
+```
 
 ## Documentation
 
