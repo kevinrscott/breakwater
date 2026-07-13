@@ -9,6 +9,11 @@ __pycache__/
 .env.*
 !.env.example
 
+# Local credentials and private keys
+credentials.json
+*.key
+*.pem
+
 # Testing and development tools
 .pytest_cache/
 .ruff_cache/
