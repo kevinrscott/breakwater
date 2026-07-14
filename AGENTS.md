@@ -28,42 +28,49 @@ If requirements materially conflict, report the conflict instead of silently cho
 
 ## Development environment
 
-These commands are provisional until the repository bootstrap is complete. They assume the planned layout in `docs/v0-spec.md`, with Python project files and `manage.py` under `app/`. Update them to match the scripts and paths that are actually scaffolded.
+Django runs on the host and connects to PostgreSQL running through Docker Compose.
 
 Start repository-level services from the repository root:
 
-```text
-docker compose up -d
+```powershell
+docker compose --env-file app/.env config
+docker compose --env-file app/.env up -d
+docker compose --env-file app/.env ps
 ```
 
 Run Python and Django commands from the `app/` directory:
 
-```text
+```powershell
 cd app
-uv sync
+uv sync --locked
+uv run python manage.py check
 uv run python manage.py migrate
 uv run python manage.py runserver
-uv run python manage.py import_jobs
+```
+
+When finished, stop PostgreSQL from the repository root without deleting its data volume:
+
+```powershell
+cd ..
+docker compose --env-file app/.env down
 ```
 
 ## Testing and verification
 
-Run Python checks from `app/` and Compose validation from the repository root. These commands remain provisional until the application and CI workflow are scaffolded:
+Run Django checks from the `app/` directory and Compose validation from the repository root:
 
-```text
+```powershell
 cd app
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
 ```
 
-```text
-docker compose config
+```powershell
+cd ..
+docker compose --env-file app/.env config
 ```
 
-Once CI is configured, keep this list aligned with the workflows under `.github/workflows/`. The workflow files are the final source of truth for CI behavior.
+Ruff, pytest, and CI checks are not yet configured. Add their commands here when that tooling is implemented.
 
 Do not claim that a check passed unless it was actually run successfully.
 
