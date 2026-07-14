@@ -126,6 +126,28 @@ final
 
 The workflow above describes the preferred repository process. Do not create branches, commit, push, merge, rebase, or open pull requests unless explicitly requested.
 
+## GitHub issue guidelines
+
+When drafting or reviewing implementation issues, use this structure by default:
+
+- Goal
+- Scope
+- Acceptance criteria
+- Out of scope
+- Verification
+
+Keep issues concise, well-bounded, and focused on a single pull request.
+
+Avoid repeating the same requirement across multiple sections.
+
+Keep implementation details in **Scope** and acceptance criteria focused on objectively verifiable outcomes.
+
+If an issue begins to resemble a specification, move long-lived design details into `docs/v0-spec.md`.
+
+Use engineering judgment rather than process for its own sake. Small, obvious cleanup work does not always require a GitHub issue.
+
+Draft issue content only. Do not create, edit, close, or otherwise modify GitHub issues unless explicitly requested.
+
 ## Project rules
 
 ### Do
