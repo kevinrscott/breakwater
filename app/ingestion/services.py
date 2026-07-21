@@ -4,8 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
+from ingestion.adapters.lever import normalize_lever_posting
+from ingestion.adapters.lever_fetch import fetch_lever_postings
 from ingestion.types import NormalizedJobInput
 from jobs.models import EmployerSource, Job
 
@@ -24,6 +27,78 @@ class JobUpsertResult:
     @property
     def unchanged(self) -> bool:
         return not (self.created or self.changed or self.reactivated)
+
+
+@dataclass(frozen=True, slots=True)
+class LeverImportResult:
+    fetched: int
+    created: int
+    changed: int
+    unchanged: int
+    reactivated: int
+
+
+def import_lever_source(employer_source: EmployerSource) -> LeverImportResult:
+    """Fetch, normalize, and atomically import one persisted Lever source."""
+    imported_at = timezone.now()
+
+    try:
+        if employer_source.source_type != "LEVER":
+            raise ValueError(
+                "Lever imports require an employer source with source_type 'LEVER'."
+            )
+
+        raw_postings = fetch_lever_postings(
+            board_identifier=employer_source.board_identifier,
+            api_instance=employer_source.api_instance,
+        )
+        normalized_jobs = [
+            normalize_lever_posting(
+                raw_posting,
+                company_name=employer_source.company_name,
+            )
+            for raw_posting in raw_postings
+        ]
+
+        counts = {
+            "created": 0,
+            "changed": 0,
+            "unchanged": 0,
+            "reactivated": 0,
+        }
+        with transaction.atomic():
+            for normalized_job in normalized_jobs:
+                result = upsert_normalized_job(
+                    employer_source=employer_source,
+                    normalized_job=normalized_job,
+                    imported_at=imported_at,
+                )
+                counts["created"] += int(result.created)
+                counts["changed"] += int(result.changed)
+                counts["unchanged"] += int(result.unchanged)
+                counts["reactivated"] += int(result.reactivated)
+
+            EmployerSource.objects.filter(pk=employer_source.pk).update(
+                last_import_at=imported_at,
+                last_success_at=imported_at,
+                consecutive_failures=0,
+                updated_at=imported_at,
+            )
+    except Exception:
+        EmployerSource.objects.filter(pk=employer_source.pk).update(
+            last_import_at=imported_at,
+            consecutive_failures=F("consecutive_failures") + 1,
+            updated_at=imported_at,
+        )
+        raise
+
+    return LeverImportResult(
+        fetched=len(raw_postings),
+        created=counts["created"],
+        changed=counts["changed"],
+        unchanged=counts["unchanged"],
+        reactivated=counts["reactivated"],
+    )
 
 
 def upsert_normalized_job(
