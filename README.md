@@ -76,6 +76,32 @@ uv run python manage.py check
 uv run python manage.py migrate
 ```
 
+### Configure and import Lever sources
+
+The import command requires at least one active Lever `EmployerSource` record. It
+does not create or discover employer boards. From `app/`, this example creates or
+updates one source using placeholder values and prints the database ID used by
+`--source-id`:
+
+```powershell
+uv run python manage.py shell -c "from jobs.models import EmployerSource; source, _ = EmployerSource.objects.update_or_create(source_type='LEVER', api_instance='global', board_identifier='example-company', defaults={'company_name': 'Example Company', 'careers_url': 'https://jobs.lever.co/example-company', 'is_active': True}); print(f'EmployerSource ID: {source.pk}')"
+```
+
+Replace `example-company`, `Example Company`, and the careers URL with the
+employer's values. Use `api_instance='eu'` for a Lever EU board.
+
+Import every configured active Lever source:
+
+```powershell
+uv run python manage.py import_jobs
+```
+
+Import one active Lever source by the database ID printed above:
+
+```powershell
+uv run python manage.py import_jobs --source-id 1
+```
+
 Start the development server:
 
 ```powershell
