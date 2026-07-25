@@ -123,8 +123,7 @@ class ImportLeverSourceTests(TestCase):
         request = mock_urlopen.call_args.args[0]
         self.assertEqual(
             request.full_url,
-            "https://api.eu.lever.co/v0/postings/"
-            "configured%2Fboard?mode=json",
+            "https://api.eu.lever.co/v0/postings/configured%2Fboard?mode=json",
         )
         self.assertEqual(mock_urlopen.call_args.kwargs["timeout"], 10.0)
 
@@ -190,14 +189,10 @@ class ImportLeverSourceTests(TestCase):
                 reactivated=2,
             ),
         )
-        changed_reactivated = Job.objects.get(
-            source_job_id="changed-reactivated"
-        )
+        changed_reactivated = Job.objects.get(source_job_id="changed-reactivated")
         self.assertTrue(changed_reactivated.is_active)
         self.assertEqual(changed_reactivated.last_changed_at, attempted_at)
-        unchanged_reactivated = Job.objects.get(
-            source_job_id="unchanged-reactivated"
-        )
+        unchanged_reactivated = Job.objects.get(source_job_id="unchanged-reactivated")
         self.assertTrue(unchanged_reactivated.is_active)
         self.assertEqual(unchanged_reactivated.last_changed_at, first_import)
         self.assertEqual(unchanged_reactivated.last_seen_at, attempted_at)

@@ -76,6 +76,26 @@ uv run python manage.py check
 uv run python manage.py migrate
 ```
 
+### Run development checks
+
+Keep PostgreSQL running, then install the development dependency group and run
+the same backend quality, test, migration, and dependency checks used by CI:
+
+```powershell
+Set-Location app
+uv sync --locked --group dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+uv run python manage.py check
+uv run python manage.py makemigrations --check --dry-run
+uv run pip-audit
+```
+
+The pytest configuration uses PostgreSQL and blocks non-loopback network
+connections, so tests cannot make live requests to Lever or another third-party
+source.
+
 ### Configure and import Lever sources
 
 The import command requires at least one active Lever `EmployerSource` record. It

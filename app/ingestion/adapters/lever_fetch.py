@@ -148,9 +148,7 @@ def _validate_board_identifier(board_identifier: str, api_instance: object) -> s
                 else repr(board_identifier)
             ),
             api_instance=(
-                api_instance
-                if isinstance(api_instance, str)
-                else repr(api_instance)
+                api_instance if isinstance(api_instance, str) else repr(api_instance)
             ),
             url=None,
             attempts=0,
@@ -164,9 +162,7 @@ def _validate_api_instance(api_instance: object, board_identifier: str) -> str:
             "API instance must be 'global' or 'eu'.",
             board_identifier=board_identifier,
             api_instance=(
-                api_instance
-                if isinstance(api_instance, str)
-                else repr(api_instance)
+                api_instance if isinstance(api_instance, str) else repr(api_instance)
             ),
             url=None,
             attempts=0,

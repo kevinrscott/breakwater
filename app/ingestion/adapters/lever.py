@@ -163,9 +163,7 @@ def _optional_string(
         return None
     if not isinstance(value, str):
         label = field_path or field_name
-        raise NormalizationError(
-            f"Lever field '{label}' must be a string or null."
-        )
+        raise NormalizationError(f"Lever field '{label}' must be a string or null.")
     return value.strip() or None
 
 
@@ -181,8 +179,7 @@ def _location_text(categories: Mapping[str, JSONValue]) -> str:
         for index, location in enumerate(all_locations):
             if not isinstance(location, str):
                 raise NormalizationError(
-                    "Lever field "
-                    f"'categories.allLocations[{index}]' must be a string."
+                    f"Lever field 'categories.allLocations[{index}]' must be a string."
                 )
             normalized = _normalize_plain_text(location)
             if normalized and normalized not in locations:
