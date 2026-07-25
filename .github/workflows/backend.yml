@@ -1,0 +1,94 @@
+name: Backend
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend quality
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SECRET_KEY: ci-only-placeholder-not-a-secret
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      POSTGRES_DB: breakwater
+      POSTGRES_USER: breakwater
+      POSTGRES_PASSWORD: ci-only-postgres-password
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+    services:
+      postgres:
+        image: postgres:17.10-bookworm
+        env:
+          POSTGRES_DB: breakwater
+          POSTGRES_USER: breakwater
+          POSTGRES_PASSWORD: ci-only-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U breakwater -d breakwater"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: app/.python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          working-directory: app
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Run Ruff lint
+        run: uv run ruff check .
+
+      - name: Check Ruff formatting
+        run: uv run ruff format --check .
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Run Django system check
+        run: uv run python manage.py check
+
+      - name: Check for missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Audit Python dependencies
+        run: uv run pip-audit
+
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "${GITHUB_WORKSPACE}:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git --redact --verbose --gitleaks-ignore-path /repo/.gitleaksignore /repo

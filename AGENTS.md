@@ -57,20 +57,37 @@ docker compose --env-file app/.env down
 
 ## Testing and verification
 
-Run Django checks from the `app/` directory and Compose validation from the repository root:
+Start PostgreSQL from the repository root before running the backend test suite:
+
+```powershell
+docker compose --env-file app/.env up -d
+docker compose --env-file app/.env ps
+```
+
+Install the development dependency group and run backend quality, test, migration,
+and dependency checks from the `app/` directory:
 
 ```powershell
 cd app
+uv sync --locked --group dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
+uv run pip-audit
 ```
+
+Run Compose validation and the whitespace check from the repository root:
 
 ```powershell
 cd ..
 docker compose --env-file app/.env config
+git diff --check
 ```
 
-Ruff, pytest, and CI checks are not yet configured. Add their commands here when that tooling is implemented.
+pytest uses the existing PostgreSQL-backed Django settings and blocks non-loopback
+network connections during tests.
 
 Do not claim that a check passed unless it was actually run successfully.
 

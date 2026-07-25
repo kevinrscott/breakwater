@@ -9,5 +9,28 @@ dependencies = [
     "python-dotenv>=1.1,<2.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pip-audit>=2.10,<3.0",
+    "pytest>=9.0,<10.0",
+    "pytest-django>=4.11,<5.0",
+    "pytest-socket>=0.7,<1.0",
+    "ruff>=0.16,<1.0",
+]
+
 [tool.uv]
 package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = ["**/migrations/*.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+testpaths = ["jobs", "ingestion"]
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--disable-socket --allow-hosts=localhost,127.0.0.1,::1"

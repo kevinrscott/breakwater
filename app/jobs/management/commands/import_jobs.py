@@ -85,6 +85,4 @@ class Command(BaseCommand):
         )
 
         if failed:
-            raise CommandError(
-                f"{failed} of {attempted} Lever source imports failed."
-            )
+            raise CommandError(f"{failed} of {attempted} Lever source imports failed.")
