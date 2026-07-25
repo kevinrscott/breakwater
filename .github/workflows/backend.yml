@@ -50,9 +50,10 @@ jobs:
           python-version-file: app/.python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
+          working-directory: app
 
       - name: Install dependencies
         run: uv sync --locked --group dev
@@ -85,7 +86,9 @@ jobs:
           fetch-depth: 0
 
       - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: "false"
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "${GITHUB_WORKSPACE}:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git --redact --verbose /repo
