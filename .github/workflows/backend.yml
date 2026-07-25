@@ -91,4 +91,4 @@ jobs:
             --user "$(id -u):$(id -g)" \
             --volume "${GITHUB_WORKSPACE}:/repo" \
             ghcr.io/gitleaks/gitleaks:v8.30.1 \
-            git --redact --verbose /repo
+            git --redact --verbose --gitleaks-ignore-path /repo/.gitleaksignore /repo
