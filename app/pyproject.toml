@@ -31,6 +31,6 @@ select = ["E4", "E7", "E9", "F", "I", "B"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
-testpaths = ["jobs", "ingestion"]
+testpaths = ["jobs", "ingestion", "classification"]
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
 addopts = "--disable-socket --allow-hosts=localhost,127.0.0.1,::1"
