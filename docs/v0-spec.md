@@ -131,13 +131,11 @@ is_active, last_import_at, last_success_at, consecutive_failures,
 notes, created_at, updated_at
 ```
 
-> **Open gap:** `career_track`, `role_family`, and `workplace_type` are in the model and referenced throughout (ingestion flow, admin filters, match-band logic) but don't have classification rules written anywhere yet — unlike experience, seniority, and remote eligibility below, which each have one. Worth writing before Step 6 of the implementation order.
-
 ## Ingestion design
 
 The management command orchestrates the import; it doesn't contain the business logic.
 
-**Flow:** fetch raw jobs → validate source fields → normalize → calculate payload hash → classify experience → classify seniority → classify remote eligibility → resolve known location → calculate distance if possible → determine career track → determine match band → upsert on `source_type + source_job_id` → set first_seen/last_seen/last_changed.
+**Flow:** fetch raw jobs → validate source fields → normalize → calculate payload hash → classify career track and role family → classify workplace type → classify experience and seniority → classify remote eligibility or resolve location and distance as applicable → determine match band → build explanation and evidence → upsert on `source_type + source_job_id` → set first_seen/last_seen/last_changed.
 
 **Adapter contract:**
 
@@ -150,70 +148,189 @@ class JobSourceAdapter(Protocol):
 
 Even with one adapter in v0, this contract keeps the management command from becoming source-specific. `fetch_jobs` applies an explicit timeout and a capped retry-with-backoff policy; a failed single-source import terminates with a clear error rather than hanging. Multi-board ATS adapters isolate failures per board.
 
-**Idempotent reimports:** create on new source ID, update `last_seen_at` on existing, update the record only when the payload hash changes, set `last_changed_at` only on meaningful content changes, and never overwrite user notes or reset saved/hidden/viewed/applied state.
+**Idempotent reimports:** create on new source ID, update `last_seen_at` on existing, update source-controlled fields only when the payload hash changes, set `last_changed_at` only on meaningful source-controlled content changes, and never overwrite user notes or reset saved/hidden/viewed/applied state.
 
-## Experience classification
+**Version-aware reclassification:** reclassify an existing job whenever its stored `classifier_version` differs from the current classifier version, even when its source payload hash is unchanged. A missing or null stored version counts as different. A classifier-only update may refresh derived classification fields, evidence, and explanation, but must not update `last_changed_at`; that timestamp remains tied to meaningful source-controlled content changes. Reclassification must preserve all owner-controlled review state.
 
-Store separately: `years_required_min`, `years_required_max`, `years_preferred`, `experience_requirement_type` (`REQUIRED / PREFERRED / NICE_TO_HAVE / FLEXIBLE / AMBIGUOUS / NOT_FOUND`).
+**Atomic classification persistence:** persist all derived classification fields, evidence, explanation, and `classifier_version` as one complete result. Store the new classifier version only after the entire classification run succeeds. If classification fails, retain the prior complete classification result rather than combining fields produced by different classifier versions.
 
-Examples: "1+ years required" → `required_min = 1`. "1–2 years of professional experience" → `required_min = 1, required_max = 2`. "2 years preferred" → `preferred = 2, type = PREFERRED`. "Experience with Python" → no numeric requirement. "5 years of combined education and experience" must **not** automatically become 5 professional years.
+## Classification contract
 
-**Match bands:**
+Classification is deterministic, explainable, testable, and auditable. It produces career, workplace, geographic eligibility, experience, seniority, and match results in one versioned run. Missing or contradictory critical evidence is preserved as `UNCLEAR` rather than guessed or silently excluded.
 
-- **MATCH** — junior/entry-level/new-grad/associate/internship language, 0–1 years required, no leadership signals.
-- **POSSIBLE** (the default useful queue) — 0–2 years required, up to 3 preferred, flexible equivalent-experience wording, no clear senior ownership.
-- **STRETCH** — 2–3 years required, strong role fit, no staff/lead/architect/manager/director expectations or team-management responsibility; explanation states why it's a stretch.
-- **NOT_A_MATCH** — senior/staff/principal/lead/architect/manager/director title, 4+ years explicitly required, team-management or hiring responsibility, org-wide or strategic technical ownership.
-- **UNCLEAR** — snippet-only content, conflicting required/preferred wording, unextractable experience, title/responsibilities disagree. Stays reviewable.
+### Career track and role family
 
-## Seniority classification
+Career tracks are:
 
-Strong negative signals: senior, staff, principal, lead engineer, architect, manager, director, head of, "manage a team," "performance management," "hire engineers," "set organization-wide strategy," "own engineering standards."
-
-Must be contextual — "lead a small feature" isn't automatically Lead-level, but "Lead Engineer" is a strong signal, and "mentor junior developers" may indicate seniority but should be combined with other evidence rather than triggering alone.
-
-The classifier records: matched phrase, rule identifier, positive/negative signal, and impact on the match band.
-
-## Remote eligibility
-
-Field: `remote_canada_eligibility` — `YES / NO / UNCLEAR`.
-
-- **YES** — explicit Canada-remote language, "open to Canadian applicants," eligible provinces including BC, or a Canadian location with a clearly remote arrangement.
-- **NO** — explicit US-only, restricted to an unsupported country/state/province, or legally restricted outside Canada.
-- **UNCLEAR** — posting just says "remote" with no geography, conflicting location fields, snippet-only content, or a timezone listed without residency rules.
-
-The word "remote" alone must never produce `YES`.
-
-## Hybrid distance
-
-Haversine distance is simple once coordinates exist — the hard part is resolving location text into coordinates.
-
-**v0 strategy:** a small curated city dictionary (Nanaimo, Parksville, Qualicum Beach, Duncan, Courtenay, Comox, Victoria, Vancouver, Burnaby, Richmond, Surrey, New Westminster), each with city/province/lat/long. Configure the search origin via environment rather than hardcoding it into field names:
-
+```text
+PRIMARY_DEVELOPMENT
+ADJACENT_TECHNOLOGY
+INTERIM
+OUT_OF_SCOPE
+UNCLEAR
 ```
+
+Role families are:
+
+```text
+SOFTWARE_DEVELOPMENT
+QA_AUTOMATION
+APPLICATION_SUPPORT
+TECHNICAL_SUPPORT
+IMPLEMENTATION
+IT_SYSTEMS
+ADMINISTRATION
+CUSTOMER_SUPPORT
+DATA_OPERATIONS
+TECHNICAL_WRITING
+OTHER
+UNCLEAR
+```
+
+The normal role-family-to-track mapping is:
+
+| Career track | Role families |
+|---|---|
+| `PRIMARY_DEVELOPMENT` | `SOFTWARE_DEVELOPMENT` |
+| `ADJACENT_TECHNOLOGY` | `QA_AUTOMATION`, `APPLICATION_SUPPORT`, `TECHNICAL_SUPPORT`, `IMPLEMENTATION`, `IT_SYSTEMS` |
+| `INTERIM` | `ADMINISTRATION`, `CUSTOMER_SUPPORT`, `DATA_OPERATIONS`, `TECHNICAL_WRITING` |
+| `OUT_OF_SCOPE` | `OTHER` |
+| `UNCLEAR` | `UNCLEAR` |
+
+For v0, `SOFTWARE_DEVELOPMENT` includes backend, frontend, full-stack, web, WordPress, Python, and integration-development roles. Do not create a more granular or exhaustive taxonomy yet.
+
+Use the title as the primary evidence for career track and role family. Responsibilities may resolve an ambiguous title, but incidental technology, industry, or skill mentions do not determine the family.
+
+When two or more role families remain equally plausible, set `role_family = UNCLEAR`. Preserve the career track when every plausible family maps to the same track; for example, a role that could be either `APPLICATION_SUPPORT` or `TECHNICAL_SUPPORT` may be `career_track = ADJACENT_TECHNOLOGY` and `role_family = UNCLEAR`. Set `career_track = UNCLEAR` only when the plausible families cross career-track boundaries.
+
+`OTHER / OUT_OF_SCOPE` means the role is understood confidently but falls outside the supported v0 role families. `UNCLEAR / UNCLEAR` means the role itself cannot be identified confidently because evidence is missing, ambiguous, or contradictory. Never use `OTHER` as a fallback for uncertainty.
+
+Career track and match band are separate decisions. For example, an attainable administrative job may be `INTERIM` and `MATCH`; the interface and explanation must not present it as equivalent to a `PRIMARY_DEVELOPMENT` match.
+
+`role_family = UNCLEAR` does not automatically force `match_band = UNCLEAR` when the career track is known and finer role-family precision is unnecessary for the match decision. `career_track = UNCLEAR` is critical career uncertainty and does force an unclear match unless a hard exclusion already applies.
+
+### Workplace and geographic eligibility
+
+Workplace types are:
+
+```text
+REMOTE
+HYBRID
+ON_SITE
+UNCLEAR
+```
+
+Use structured source workplace evidence when it is reliable. Missing or `unspecified` structured evidence remains `UNCLEAR` unless explicit posting text resolves it. A generic workplace mention is not necessarily a conflict; when reliable posting-level workplace metadata and explicit posting text directly conflict, return `UNCLEAR` unless one source can safely be treated as generic, stale, or less authoritative.
+
+Workplace type must be sufficiently resolved before applying a geographic eligibility path. `REMOTE` jobs require remote-Canada eligibility evidence. `HYBRID` and `ON_SITE` jobs require location and distance evidence. Missing evidence from a geographic category that does not apply to the resolved workplace type does not produce `UNCLEAR`.
+
+`REMOTE` jobs use `remote_canada_eligibility`:
+
+```text
+YES
+NO
+UNCLEAR
+```
+
+- **YES** — explicit Canada-remote language, "open to Canadian applicants," eligible provinces including BC, or reliable posting-level country, residency, province, or eligibility metadata paired with a clearly remote arrangement and no narrower conflicting restriction.
+- **NO** — explicit US-only language, restriction to an unsupported country/state/province, or a legal residency restriction outside Canada.
+- **UNCLEAR** — "remote" without eligible geography, unresolved authoritative eligibility conflicts, incomplete applicable evidence, or a timezone without residency rules.
+
+Reliable posting-level country, residency, province, or eligibility metadata may contribute to remote-Canada eligibility. Company headquarters, company country, office location, and timezone alone do not establish applicant eligibility. The word "remote" alone must never establish Canadian eligibility.
+
+Explicit posting restrictions override generic or permissive metadata. For example, generic remote metadata paired with "Applicants must reside in the United States" produces `NO`. When authoritative posting-level structured evidence and explicit posting text directly conflict, and neither can safely be treated as generic, stale, or less authoritative, return `UNCLEAR`; authoritative Canadian eligibility metadata conflicting with equally authoritative residency text is one such case.
+
+`HYBRID` and `ON_SITE` jobs use resolved location and distance from the configured search origin. Resolve coordinates only from the curated v0 location data; never guess coordinates. If the location is ambiguous or cannot be resolved with the curated dictionary, preserve its text, leave coordinates and distance null, and treat location as `UNCLEAR` for matching. Absence from the dictionary alone is not proof that a location is unsupported.
+
+A location is a hard exclusion only when available evidence establishes that it is outside the supported geography or configured radius. A clearly identified Toronto on-site role may therefore be excluded, while an unresolved Ladysmith role remains `UNCLEAR` solely because the v0 dictionary cannot resolve it. Do not add guessed coordinates to force a decision.
+
+Haversine distance is simple once coordinates exist. The v0 curated city dictionary contains Nanaimo, Parksville, Qualicum Beach, Duncan, Courtenay, Comox, Victoria, Vancouver, Burnaby, Richmond, Surrey, and New Westminster, each with city, province, latitude, and longitude. Configure the search origin rather than hardcoding it into field names:
+
+```text
 SEARCH_ORIGIN_NAME=Nanaimo, BC
 SEARCH_ORIGIN_LATITUDE=...
 SEARCH_ORIGIN_LONGITUDE=...
 DEFAULT_HYBRID_RADIUS_KM=...
 ```
 
-If a posting names a known city, resolve and store distance. If it names an ambiguous region (e.g. "Greater Vancouver," "Vancouver Island," "Nanaimo or Vancouver"), keep the raw text, leave distance null, and mark the location unclear — don't guess unless a rule can safely resolve it. PostGIS and cached geocoding replace this dictionary in v1.
+PostGIS and cached geocoding remain v1 work.
 
-## Classification evidence
+### Experience and seniority
 
-A JSON field is sufficient for v0:
+Store required and preferred experience separately: `years_required_min`, `years_required_max`, `years_preferred`, and `experience_requirement_type` (`REQUIRED / PREFERRED / NICE_TO_HAVE / FLEXIBLE / AMBIGUOUS / NOT_FOUND`).
+
+Examples: "1+ years required" → `required_min = 1`. "1–2 years of professional experience" → `required_min = 1, required_max = 2`. "2 years preferred" → `preferred = 2, type = PREFERRED`. "Experience with Python" → no numeric requirement. "5 years of combined education and experience" must **not** automatically become five professional years.
+
+Strong seniority evidence includes senior, staff, principal, lead engineer, architect, manager, director, head of, "manage a team," "performance management," "hire engineers," "set organization-wide strategy," and "own engineering standards."
+
+Seniority evidence must be contextual. "Lead a small feature" is not automatically Lead-level; "Lead Engineer" is a strong signal; and "mentor junior developers" may indicate seniority but needs other supporting evidence rather than triggering a hard exclusion alone.
+
+### Match-band precedence
+
+Evaluate match bands in this order so overlapping evidence has one deterministic outcome.
+
+First apply hard exclusions. Any of the following produces `NOT_A_MATCH`:
+
+- the supported career track is `OUT_OF_SCOPE`;
+- strong senior, staff, principal, architect, management, hiring, or organization-wide ownership evidence;
+- a required minimum of four or more years;
+- a `REMOTE` job has `remote_canada_eligibility = NO`; or
+- available evidence establishes that a `HYBRID` or `ON_SITE` location is outside the supported geography or configured radius.
+
+When no hard exclusion applies, return `UNCLEAR` if critical career, experience, workplace, or the applicable geographic evidence is incomplete or contradictory. Remote eligibility is applicable to `REMOTE`; location and distance are applicable to `HYBRID` and `ON_SITE`. Missing evidence from an inapplicable category does not affect the band. The absence of a numeric experience requirement is not itself incomplete when the available content has been reviewed and no numeric requirement is found. `UNCLEAR` stays reviewable.
+
+Required numeric experience produces these mutually exclusive outcomes:
+
+- **MATCH** — an exact or bounded required maximum of no more than one year.
+- **POSSIBLE** — an exact or bounded required maximum greater than one and no more than two years, or `1+ years` required.
+- **STRETCH** — `2+ years` required; `3+ years` required; exactly three years required; or a bounded required range extending beyond two years while its minimum remains below four.
+- **NOT_A_MATCH** — a required minimum of four or more years, including `4 years`, `4+ years`, or a range such as `5–7 years`.
+
+A bounded range such as `1–4 years` is `STRETCH`, not automatically a four-year-minimum `NOT_A_MATCH`. Required and preferred experience remain separate. Four or more years preferred, but not required, may produce `STRETCH` rather than `NOT_A_MATCH`. When there is no numeric requirement, explicit junior, entry-level, new-graduate, associate, trainee, or internship language produces `MATCH`; flexible equivalent-experience wording, up to three years preferred, or an otherwise clear supported non-senior role produces `POSSIBLE`.
+
+Hard exclusions take precedence over positive language: for example, a posting labelled "junior" with a required minimum of four years remains `NOT_A_MATCH`.
+
+### Evidence, explanations, and versioning
+
+`classification_evidence` has these category keys:
+
+```text
+career
+experience
+seniority
+workplace
+remote
+location
+match
+```
+
+Each evidence entry uses a stable `rule_id`, names the relevant normalized or persisted `source_field`, and includes only a short relevant `excerpt` when source text is needed. Store structured values as separately typed fields rather than encoding multiple or numeric values into a string. A single `result` field remains appropriate for an individual outcome such as `REMOTE`, `YES`, `MATCH`, or `UNCLEAR`. Do not copy complete descriptions into evidence. Empty categories are stored as empty arrays so a complete run has a consistent shape.
+
+One concise illustrative record:
 
 ```json
 {
-  "experience": [{"rule_id": "EXP_REQUIRED_RANGE", "text": "1-2 years of software development experience", "type": "required_range", "minimum": 1, "maximum": 2}],
+  "career": [{"rule_id": "CAREER_TITLE_SOFTWARE", "source_field": "title", "excerpt": "Junior Software Developer", "career_track": "PRIMARY_DEVELOPMENT", "role_family": "SOFTWARE_DEVELOPMENT"}],
+  "experience": [{"rule_id": "EXP_REQUIRED_EXACT", "source_field": "description_text", "excerpt": "1 year of development experience", "requirement_type": "REQUIRED", "minimum": 1, "maximum": 1}],
   "seniority": [],
-  "remote": [{"rule_id": "REMOTE_CANADA_EXPLICIT", "text": "This role is open to applicants across Canada", "result": "YES"}]
+  "workplace": [{"rule_id": "WORKPLACE_STRUCTURED_REMOTE", "source_field": "workplace_evidence", "result": "REMOTE"}],
+  "remote": [{"rule_id": "REMOTE_CANADA_EXPLICIT", "source_field": "description_text", "excerpt": "open to applicants across Canada", "result": "YES"}],
+  "location": [],
+  "match": [{"rule_id": "MATCH_MAX_ONE_YEAR", "source_field": "years_required_max", "result": "MATCH"}]
 }
 ```
 
-Plus a readable explanation string, e.g.: "Possible match because the posting requests 1–2 years of experience, explicitly accepts applicants across Canada, and contains no seniority or people-management signals."
+When `content_completeness` affects the final band, record the reason in the `match` category rather than adding another evidence category:
 
-This buys immediate trust, easier debugging, a path to user correction, regression fixtures later, and portfolio demonstrations later.
+```json
+{"rule_id": "MATCH_PARTIAL_CONTENT", "source_field": "content_completeness", "result": "UNCLEAR"}
+```
+
+`classification_explanation` is a concise readable summary of the decisive evidence, not a dump of every match. Example: "Primary-development match: the title is Junior Software Developer, the posting requires one year of experience, and the remote role is explicitly open across Canada."
+
+`classifier_version` identifies the complete classification run, beginning with `v0.1`. It covers all career, experience, seniority, workplace, remote, location, match, evidence, and explanation rules; do not version components independently in v0. Change the version whenever a rule change can alter persisted classification output. The version-aware reclassification and atomic-persistence rules in the ingestion contract apply whenever that version changes.
+
+This evidence contract buys immediate trust, easier debugging, a path to user correction, regression fixtures later, and portfolio demonstrations later.
 
 ## Interface (Django Admin)
 
@@ -256,7 +373,7 @@ CI scanning can catch an accidental secret commit quickly, but it doesn't preven
 3. **Bootstrap the repo** — Django, PostgreSQL, Docker Compose, pytest, Ruff, GitHub Actions, README, `.env.example`.
 4. **Add the Job model** — stable source identity, raw payload storage, first/last-seen timestamps, review timestamps, classification fields, unique constraint.
 5. **Add the source adapter and import command** — fetch, normalize, hash, upsert, error reporting, idempotency tests.
-6. **Add classification modules** — experience, seniority, remote eligibility, career track, match band, explanation, evidence JSON. *(Resolve the career_track/workplace_type gap above before or during this step.)*
+6. **Add classification modules** — experience, seniority, remote eligibility, career track, role family, workplace type, match band, explanation, evidence JSON, and classifier version.
 7. **Add location handling** — curated coordinates, Haversine distance, unknown-location behaviour, distance display.
 8. **Customize Django Admin** — columns, filters, actions, original-posting links, useful default ordering.
 9. **Use it for a real week** — record useful jobs, false positives/negatives, wrong extractions, missing filters, repetitive actions, source quality.

@@ -61,7 +61,7 @@ Classification quality is eventually measured against a labelled fixture dataset
 
 ### Career tracks
 
-Three tracks, kept visibly separate — an interim role should never be presented as equivalent to software development:
+Career tracks stay visibly separate so different kinds of useful work are not presented as equivalent:
 
 **Primary development roles** — e.g. Junior Software Developer/Engineer, Backend/Full-Stack/Web Developer, Python Developer, New Graduate Software Engineer, WordPress Developer, Integration Developer.
 
@@ -69,7 +69,9 @@ Three tracks, kept visibly separate — an interim role should never be presente
 
 **Interim roles** — e.g. Data Entry, Administrative Assistant, Customer Support, Data Annotator, Content Moderator, Junior Technical Writer.
 
-> **Open question:** the rules for actually classifying a job into one of these three tracks (and into `workplace_type`) aren't written yet — see the flagged gap in [`v0-spec.md`](v0-spec.md#data-model).
+**Out-of-scope roles** are explicit exclusions, while **unclear roles** remain visible for review. Career track and attainability are independent: an interim role may be a strong match without being presented as a primary-development opportunity.
+
+Workplace classification is similarly explicit: remote, hybrid, on-site, or unclear. Remote eligibility and commute feasibility are separate decisions, and uncertain geography is preserved rather than guessed. The exact taxonomy and precedence rules live in the [v0 classification contract](v0-spec.md#classification-contract).
 
 ## Major risks
 
