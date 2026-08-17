@@ -11,6 +11,11 @@ class ExperienceRequirementType(str, Enum):
     NOT_FOUND = "NOT_FOUND"
 
 
+class SenioritySignalStrength(str, Enum):
+    STRONG = "STRONG"
+    SUPPORTING = "SUPPORTING"
+
+
 @dataclass(frozen=True, slots=True)
 class ExperienceEvidence:
     rule_id: str
@@ -28,3 +33,17 @@ class ExperienceClassification:
     years_preferred: int | None
     requirement_type: ExperienceRequirementType
     evidence: tuple[ExperienceEvidence, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SeniorityEvidence:
+    rule_id: str
+    source_field: str
+    excerpt: str
+    strength: SenioritySignalStrength
+
+
+@dataclass(frozen=True, slots=True)
+class SeniorityClassification:
+    has_strong_signal: bool
+    evidence: tuple[SeniorityEvidence, ...]
