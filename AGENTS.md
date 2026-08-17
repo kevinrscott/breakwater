@@ -143,6 +143,29 @@ final
 
 The workflow above describes the preferred repository process. Do not create branches, commit, push, merge, rebase, or open pull requests unless explicitly requested.
 
+### Documentation synchronization
+
+Documentation is part of the implementation and must remain consistent with accepted behavior and decisions.
+
+Before completing any meaningful task, check whether the change makes existing documentation inaccurate, incomplete, or stale. Update only the affected documentation when necessary.
+
+Documentation responsibilities:
+
+- `docs/v0-spec.md` — authoritative v0 requirements, behavior, terminology, and accepted implementation decisions.
+- `README.md` — setup, commands, configuration, development workflow, and user-facing usage.
+- `docs/source-notes.md` — source decisions, behavior, assumptions, restrictions, limitations, and compliance findings.
+- `docs/vision.md` — long-lived product goals and principles.
+- `docs/roadmap.md` — future direction and deferred work; do not use it as an implementation-status log.
+- `docs/usage-log.md` — findings from actual use of the application.
+
+Do not update documentation merely for the sake of touching it or rewrite unaffected sections.
+
+Do not silently change `docs/v0-spec.md` to match an implementation that conflicts with the specification. Report the conflict unless the current task explicitly authorizes changing the specification.
+
+When an accepted decision makes an older documented alternative obsolete, update the relevant documentation so the resolved decision is no longer presented as unresolved.
+
+Before reporting a task complete, state which documentation was updated or explicitly state that no documentation update was necessary.
+
 ## GitHub issue guidelines
 
 When drafting or reviewing implementation issues, use this structure by default:
@@ -180,7 +203,6 @@ Draft issue content only. Do not create, edit, close, or otherwise modify GitHub
 * Avoid unrelated refactors.
 * Explain why new dependencies are required.
 * Add or update tests when behavior changes.
-* Update documentation when behavior, setup, or architecture changes.
 * Preserve user review state on reimport (see Import rules).
 * Review the final diff for unrelated changes.
 * Report changed files and their purpose.
