@@ -58,7 +58,7 @@ Django Application
      experience/seniority/remote classification, location matching
         |
 PostgreSQL
-  -> Jobs, optional employer sources, review state, raw source payloads
+  -> Jobs, curated employer sources, review state, raw source payloads
 ```
 
 v0 is a modular monolith — simple doesn't mean everything lives in one management command.
@@ -69,34 +69,31 @@ v0 is a modular monolith — simple doesn't mean everything lives in one managem
 breakwater/
 ├── app/
 │   ├── config/
-│   ├── breakwater/
-│   │   ├── jobs/               (admin.py, models.py, services.py, management/commands/import_jobs.py)
-│   │   ├── ingestion/          (adapters/, normalization.py, types.py)
-│   │   ├── classification/     (experience.py, seniority.py, remote.py, matching.py, types.py)
-│   │   └── locations/          (cities.py, distance.py)
-│   ├── tests/
+│   ├── jobs/                   (models.py, management/commands/import_jobs.py)
+│   ├── ingestion/              (adapters/, normalization.py, services.py, types.py, tests/)
+│   ├── classification/         (experience.py, seniority.py, types.py, tests/)
+│   ├── .env.example
 │   ├── manage.py
-│   └── pyproject.toml
+│   ├── pyproject.toml
+│   └── uv.lock
 ├── docs/
 ├── .github/workflows/backend.yml
 ├── compose.yaml
-├── Dockerfile
-├── .env.example
 ├── AGENTS.md
 └── README.md
 ```
+
+Location handling remains planned v0 work. When implemented, it should follow the same direct package layout under `app/` (for example, `app/locations/`), rather than introducing an `app/breakwater/` package.
 
 Don't create `apps/web` until the frontend actually exists.
 
 ## Source selection
 
-Source quality is the most important early unknown — validate before building the importer.
+v0 uses the **Lever Postings API through Path B (employer ATS source)**. Configure five to ten deliberately selected employer boards through the curated `EmployerSource` registry. The validation evidence, limitations, and compliance caveats behind this accepted decision remain in [`source-notes.md`](source-notes.md).
 
-**Half-day source check:** test one broad source and one direct-employer ATS option, inspecting ~30–50 postings each where possible. Evaluate: number of relevant Canadian jobs, full description vs. snippet availability, stable job identifiers, original application URLs, publication dates, location quality, remote-country information, experience wording, duplicate frequency, rate limits, and terms/attribution requirements.
+Lever posting `id` is the required `source_job_id`; `hostedUrl` maps to `source_url`, and `applyUrl` maps to `application_url`. Normalize location from `categories.allLocations` (falling back to the primary location), preserve `country` and `workplaceType` as classification evidence, and build `description_text` from `descriptionPlain`, `lists[].content` converted to plain text, and `additionalPlain`. Because Lever does not document publication or update timestamps, `posted_at` may be null and remains distinct from first-seen time.
 
-**Path A — broad discovery source:** if a broad API produces enough relevant Canadian jobs. v0 includes one broad source adapter, configured search queries, search-result import, partial-description detection, and rate-limit handling — no employer registry yet.
-
-**Path B — employer ATS source:** if direct employer boards produce meaningfully better data. v0 includes one ATS adapter and five-to-ten target employers (adds the `EmployerSource` model below).
+Support Lever's global and EU API instances and isolate request or normalization failures per employer board so one board does not block the rest. Poll conservatively with the outbound-request safeguards above; the GET rate limit is unknown. Live descriptions and raw payloads remain limited to low-volume personal use until retention and redistribution rights are clarified, and any public portfolio fixtures must be synthetic.
 
 ## Data model
 
@@ -123,13 +120,15 @@ created_at, updated_at
 
 **Review state:** don't use one mutually-exclusive status field — a job can be viewed-and-saved, saved-and-applied, applied-and-later-expired, etc. Use the four timestamps above. A job is "new" when `first_viewed_at IS NULL`.
 
-### EmployerSource (Path B only)
+### EmployerSource
 
 ```
-id, company_name, source_type, board_identifier, careers_url,
+id, company_name, source_type, api_instance, board_identifier, careers_url,
 is_active, last_import_at, last_success_at, consecutive_failures,
 notes, created_at, updated_at
 ```
+
+Use `api_instance = global / eu` for Lever and keep `(source_type, api_instance, board_identifier)` unique.
 
 ## Ingestion design
 
@@ -369,7 +368,7 @@ CI scanning can catch an accidental secret commit quickly, but it doesn't preven
 ## Implementation order
 
 1. **Define the exact v0** — this document.
-2. **Validate the source** — sample ~30–50 jobs, choose Path A or B, record findings in `docs/source-notes.md`.
+2. **Validate the source** — completed: Lever Postings API / Path B was selected and the evidence was recorded in `docs/source-notes.md`.
 3. **Bootstrap the repo** — Django, PostgreSQL, Docker Compose, pytest, Ruff, GitHub Actions, README, `.env.example`.
 4. **Add the Job model** — stable source identity, raw payload storage, first/last-seen timestamps, review timestamps, classification fields, unique constraint.
 5. **Add the source adapter and import command** — fetch, normalize, hash, upsert, error reporting, idempotency tests.
@@ -379,27 +378,9 @@ CI scanning can catch an accidental secret commit quickly, but it doesn't preven
 9. **Use it for a real week** — record useful jobs, false positives/negatives, wrong extractions, missing filters, repetitive actions, source quality.
 10. **Decide v1 priorities using evidence** — don't follow the roadmap blindly; promote features based on real limitations found in step 9.
 
-## Initial GitHub issues
+## Implementation tracking
 
-```
-1. docs: define the v0 personal utility specification
-2. research: validate the first job source
-3. chore: initialize Django and PostgreSQL workspace
-4. chore: add Docker Compose development environment
-5. ci: add backend linting and tests
-6. feat(jobs): add the v0 job model
-7. feat(ingestion): define the source adapter contract
-8. feat(ingestion): import jobs from the first source
-9. feat(classification): extract required and preferred experience
-10. feat(classification): detect seniority and leadership signals
-11. feat(classification): classify remote Canada eligibility
-12. feat(classification): add match bands and explanations
-13. feat(location): calculate distance for supported cities
-14. feat(admin): add the job review dashboard
-15. test: cover import idempotency and classifier edge cases
-16. docs: record findings from the first week of real use
-17. planning: define evidence-based v1 priorities
-```
+The repository's actual issue and pull-request history now tracks implementation. Do not use this specification as a duplicate issue backlog; create small, current issues from the remaining v0 requirements as needed.
 
 ## v0 success metrics
 

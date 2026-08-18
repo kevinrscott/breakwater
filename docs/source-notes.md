@@ -125,19 +125,9 @@ Adzuna is a credible documented broad candidate, but it is not selected for the 
 - **Duplicate risk:** employers may publish country/location siblings with different IDs. v0 identity remains `(source_type, source_job_id)`; similarity deduplication stays out of scope.
 - **Operational risk:** each employer board can disappear, move to the EU instance, rename, or return malformed content independently.
 
-## Source-dependent changes needed later in `docs/v0-spec.md`
+## Accepted decision status
 
-Do not edit the specification as part of this issue. A later documentation change should:
-
-1. Name Lever Postings API as the v0 source and select Path B.
-2. Require `EmployerSource` with Lever site name, API instance (`global` or `EU`), careers URL, active state, and per-board success/failure tracking.
-3. Define `source_job_id` as Lever’s posting `id`; do not invent a fallback unless a future observed payload lacks it.
-4. Map `hostedUrl` to `source_url`, `applyUrl` to `application_url`, `country`/`categories.allLocations` to normalized location evidence, and `workplaceType` to workplace evidence.
-5. Define description normalization across `descriptionPlain`, `lists[].content` converted to plain text, and `additionalPlain`; keep source HTML unrendered.
-6. Allow `posted_at` to be null because the Postings API does not document publication/update timestamps; use first-seen time separately.
-7. Configure five to ten Lever employer sites and isolate request/normalization failures per board, including global/EU base URL configuration.
-8. Document conservative polling, explicit timeouts, capped retries, 404/retired-board handling, and an `UNKNOWN` GET-rate-limit assumption pending confirmation.
-9. State that live source descriptions/raw payloads are for low-volume personal use only until retention and redistribution rights are clarified; public portfolio fixtures must be synthetic.
+The Lever Postings API / Path B decision and its v0 requirements are incorporated into [`v0-spec.md`](v0-spec.md), which is authoritative for current v0 behavior. This document remains the research record for the supporting evidence, observed limitations, compliance caveats, and unresolved permission questions.
 
 ## Authoritative sources reviewed
 

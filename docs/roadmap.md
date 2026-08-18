@@ -8,15 +8,15 @@ Add only when needed: Django REST Framework, django-filter, Next.js, TypeScript,
 
 ## B1 — Improve classification *(~1–2 weeks)*
 
-Classifier versioning, evidence spans, rule identifiers, confidence scores, a user-correction workflow, regression fixtures — plus separate classification models if justified by then.
+Richer evidence spans, confidence scores, a user-correction workflow, regression fixtures, and evaluation-guided rule improvements — plus separate classification models if justified by then.
 
-**Done when:** every classification is explainable, corrected mistakes become tests, and rules can be rerun safely.
+**Done when:** corrected mistakes become tests, evaluation guides rule changes, and confidence or evidence improvements make ambiguous results easier to review without weakening deterministic explanations.
 
 ## B2 — Add a second source *(~1–2 weeks)*
 
-One additional ATS adapter, a shared adapter contract, an employer source registry, source-specific failure handling, and support for multiple source records per normalized job if needed.
+One additional ATS adapter, extension of the existing shared adapter contract for multiple sources, and support for multiple source records per normalized job if needed.
 
-**Done when:** one source failing doesn't stop the other, reimports stay idempotent, and direct employer links are still preferred.
+**Done when:** both adapters share tested normalization and import contracts, reimports stay idempotent, and direct employer links are still preferred.
 
 ## B3 — Build the Next.js frontend *(~1–2 weeks)*
 
@@ -38,7 +38,7 @@ A labelled fixture dataset, an evaluation command, published metrics, similarity
 
 ## B6 — Additional sources and scheduling *(~1–2 weeks)*
 
-A source like Lever or Ashby, source-health reporting, Redis + Celery, scheduled imports, retry policies, duplicate-task prevention, failed-task visibility. Only add Celery/Redis once manual imports are genuinely inconvenient.
+Additional source adapters beyond B2 (for example, Ashby), Redis + Celery, scheduled imports, scheduling-specific retry policies, duplicate-task prevention, and failed-task visibility. Only add Celery/Redis once manual imports are genuinely inconvenient.
 
 ## B7 — Deployment and portfolio polish *(~1–2 weeks)*
 
@@ -56,7 +56,7 @@ Resume matching specifically is not required for the project to be valuable or p
 
 ## v1 success metrics
 
-Public demo works; README explains the problem clearly; classifier metrics are published; multiple adapters share a tested contract; PostGIS supports a real workflow; deduplication is demonstrated; source failures are handled; CI passes; setup works from a clean clone; no personal information or secrets are committed; the project has meaningful issue and PR history.
+Public demo works; README explains the problem clearly; classifier metrics are published; multiple adapters share a tested contract; PostGIS supports a real workflow; deduplication is demonstrated; scheduled-import failures are visible; CI passes; setup works from a clean clone; no personal information or secrets are committed; the project has meaningful issue and PR history.
 
 ## README, once v1 exists
 
